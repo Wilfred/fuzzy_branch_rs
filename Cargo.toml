@@ -1,0 +1,12 @@
+[package]
+name = "git-fuzzy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Wilfred Hughes"]
+description = "A git tool that simplifies branch checkout by allowing partial branch name matching"
+
+[[bin]]
+name = "git-fuzzy"
+path = "src/main.rs"
+
+[dependencies]

@@ -1,0 +1,222 @@
+use std::env;
+use std::path::PathBuf;
+use std::process::{Command, exit};
+
+#[derive(Debug, Clone)]
+struct Branch {
+    name: String,
+    is_remote: bool,
+}
+
+impl Branch {
+    fn new(name: String, is_remote: bool) -> Self {
+        Branch { name, is_remote }
+    }
+}
+
+/// Find the git directory by walking up the filesystem
+fn find_git_directory() -> Option<PathBuf> {
+    let mut current_dir = env::current_dir().ok()?;
+
+    loop {
+        let git_path = current_dir.join(".git");
+        if git_path.exists() {
+            return Some(current_dir);
+        }
+
+        if !current_dir.pop() {
+            return None;
+        }
+    }
+}
+
+/// Execute a git command and return its output
+fn run_git_command(args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(args)
+        .output()
+        .map_err(|e| format!("Failed to execute git: {}", e))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// Get all git remotes
+fn get_git_remotes() -> Vec<String> {
+    run_git_command(&["remote"])
+        .unwrap_or_default()
+        .lines()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Get all git refs (branches)
+fn get_git_refs(prefix: &str) -> Vec<String> {
+    let format_arg = "--format=%(refname:short)";
+    run_git_command(&["for-each-ref", format_arg, prefix])
+        .unwrap_or_default()
+        .lines()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Get all branches (local and remote)
+fn get_all_branches() -> Vec<Branch> {
+    let mut branches = Vec::new();
+
+    // Get local branches
+    for branch in get_git_refs("refs/heads/") {
+        branches.push(Branch::new(branch, false));
+    }
+
+    // Get remote branches
+    let remotes = get_git_remotes();
+    for remote in remotes {
+        let prefix = format!("refs/remotes/{}/", remote);
+        for branch in get_git_refs(&prefix) {
+            branches.push(Branch::new(branch, true));
+        }
+    }
+
+    branches
+}
+
+/// Get tracking branches (local branches + remote branches without local counterparts)
+fn get_tracking_branches() -> Vec<Branch> {
+    let all_branches = get_all_branches();
+    let mut result = Vec::new();
+
+    // Get all local branch names (without remote prefix)
+    let local_branches: Vec<String> = all_branches
+        .iter()
+        .filter(|b| !b.is_remote)
+        .map(|b| b.name.clone())
+        .collect();
+
+    for branch in all_branches {
+        if !branch.is_remote {
+            // Include all local branches
+            result.push(branch);
+        } else {
+            // For remote branches, only include if there's no corresponding local branch
+            let remote_name = &branch.name;
+            // Remote branches are in format "remote/branch-name"
+            if let Some(idx) = remote_name.find('/') {
+                let branch_name = &remote_name[idx + 1..];
+                if !local_branches.contains(&branch_name.to_string()) {
+                    result.push(branch);
+                }
+            }
+        }
+    }
+
+    result
+}
+
+/// Match branches exactly by name
+fn match_branch_exactly(branches: &[Branch], needle: &str) -> Vec<Branch> {
+    branches
+        .iter()
+        .filter(|b| b.name == needle)
+        .cloned()
+        .collect()
+}
+
+/// Match branches by substring
+fn match_branch_substring(branches: &[Branch], needle: &str) -> Vec<Branch> {
+    branches
+        .iter()
+        .filter(|b| b.name.contains(needle))
+        .cloned()
+        .collect()
+}
+
+/// Checkout a branch
+fn checkout_branch(branch: &Branch) -> Result<(), String> {
+    let status = Command::new("git")
+        .arg("checkout")
+        .arg(&branch.name)
+        .status()
+        .map_err(|e| format!("Failed to execute git checkout: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("git checkout failed for branch: {}", branch.name));
+    }
+
+    Ok(())
+}
+
+/// Checkout a commit
+fn checkout_commit(commit: &str) -> Result<(), String> {
+    let status = Command::new("git")
+        .arg("checkout")
+        .arg(commit)
+        .status()
+        .map_err(|e| format!("Failed to execute git checkout: {}", e))?;
+
+    if !status.success() {
+        return Err(format!("git checkout failed for commit: {}", commit));
+    }
+
+    Ok(())
+}
+
+fn main() {
+    // Check if we're in a git repository
+    if find_git_directory().is_none() {
+        eprintln!("Error: Not in a git repository");
+        exit(1);
+    }
+
+    // Get command line arguments
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        eprintln!("Usage: git-fuzzy <branch-name-pattern>");
+        exit(1);
+    }
+
+    let needle = &args[1];
+
+    // Get all tracking branches
+    let branches = get_tracking_branches();
+
+    // Try exact match first
+    let mut matches = match_branch_exactly(&branches, needle);
+
+    // If no exact match, try substring match
+    if matches.is_empty() {
+        matches = match_branch_substring(&branches, needle);
+    }
+
+    match matches.len() {
+        0 => {
+            // No branch matches, try to checkout as a commit
+            println!("No branches match '{}', trying as commit...", needle);
+            if let Err(e) = checkout_commit(needle) {
+                eprintln!("Error: {}", e);
+                exit(1);
+            }
+        }
+        1 => {
+            // Exactly one match, checkout that branch
+            let branch = &matches[0];
+            println!("Checking out branch: {}", branch.name);
+            if let Err(e) = checkout_branch(branch) {
+                eprintln!("Error: {}", e);
+                exit(1);
+            }
+        }
+        _ => {
+            // Multiple matches, show them to the user
+            eprintln!("Ambiguous branch name '{}'. Multiple matches:", needle);
+            for branch in matches {
+                eprintln!("  {}", branch.name);
+            }
+            exit(1);
+        }
+    }
+}
