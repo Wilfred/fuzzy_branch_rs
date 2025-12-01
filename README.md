@@ -45,6 +45,10 @@ cp target/release/git-fuzzy /usr/local/bin/
 After installation, use the `git co` alias (or run `git-fuzzy` directly):
 
 ```bash
+# Get help
+$ git-fuzzy --help
+$ git-fuzzy --version
+
 # Checkout a branch with substring matching
 $ git co dev
 Checking out branch: develop

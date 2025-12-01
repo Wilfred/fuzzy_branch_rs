@@ -1,6 +1,17 @@
+use clap::Parser;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Command, exit};
+
+/// A git tool that simplifies branch checkout by allowing partial branch name matching
+#[derive(Parser)]
+#[command(name = "git-fuzzy")]
+#[command(version)]
+#[command(about = "Fuzzy git branch checkout", long_about = None)]
+struct Cli {
+    /// Branch name or pattern to match (e.g., 'dev' to match 'develop')
+    pattern: String,
+}
 
 #[derive(Debug, Clone)]
 struct Branch {
@@ -165,21 +176,16 @@ fn checkout_commit(commit: &str) -> Result<(), String> {
 }
 
 fn main() {
+    // Parse command line arguments
+    let cli = Cli::parse();
+
     // Check if we're in a git repository
     if find_git_directory().is_none() {
         eprintln!("Error: Not in a git repository");
         exit(1);
     }
 
-    // Get command line arguments
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: git-fuzzy <branch-name-pattern>");
-        exit(1);
-    }
-
-    let needle = &args[1];
+    let needle = &cli.pattern;
 
     // Get all tracking branches
     let branches = get_tracking_branches();
