@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::Colorize;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Command, exit};
@@ -175,6 +176,18 @@ fn checkout_commit(commit: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Highlight the matched substring in a branch name
+fn highlight_match(branch_name: &str, needle: &str) -> String {
+    if let Some(pos) = branch_name.find(needle) {
+        let before = &branch_name[..pos];
+        let matched = &branch_name[pos..pos + needle.len()];
+        let after = &branch_name[pos + needle.len()..];
+        format!("{}{}{}", before, matched.green().bold(), after)
+    } else {
+        branch_name.to_string()
+    }
+}
+
 fn main() {
     // Parse command line arguments
     let cli = Cli::parse();
@@ -210,7 +223,6 @@ fn main() {
         1 => {
             // Exactly one match, checkout that branch
             let branch = &matches[0];
-            println!("Checking out branch: {}", branch.name);
             if let Err(e) = checkout_branch(branch) {
                 eprintln!("Error: {}", e);
                 exit(1);
@@ -220,7 +232,7 @@ fn main() {
             // Multiple matches, show them to the user
             eprintln!("Ambiguous branch name '{}'. Multiple matches:", needle);
             for branch in matches {
-                eprintln!("  {}", branch.name);
+                eprintln!("  {}", highlight_match(&branch.name, needle));
             }
             exit(1);
         }

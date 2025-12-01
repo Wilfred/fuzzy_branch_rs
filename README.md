@@ -17,6 +17,8 @@ $ git co real
 The tool supports:
 - **Exact matching**: If the input exactly matches a branch name
 - **Substring matching**: If the input is contained in one or more branch names
+- **Silent operation**: No output on successful single match (only git's own output)
+- **Colored highlighting**: Matched substrings are highlighted in green when showing ambiguous matches
 - **Commit checkout**: Falls back to checking out commits if no branch matches
 - **Smart branch tracking**: Shows local branches and remote-only branches without duplicates
 
@@ -49,18 +51,18 @@ After installation, use the `git co` alias (or run `git-fuzzy` directly):
 $ git-fuzzy --help
 $ git-fuzzy --version
 
-# Checkout a branch with substring matching
+# Checkout a branch with substring matching (silent on success)
 $ git co dev
-Checking out branch: develop
+Switched to branch 'develop'
 
-# Checkout with partial name
+# Checkout with partial name (silent on success)
 $ git co real
-Checking out branch: feature/really-long-branch-name
+Switched to branch 'feature/really-long-branch-name'
 
-# Ambiguous matches show all options
+# Ambiguous matches show all options with highlighted match
 $ git co feat
 Ambiguous branch name 'feat'. Multiple matches:
-  feature/another-feature
+  feature/another-feature        # 'feat' is highlighted in green
   feature/really-long-branch-name
 
 # Fall back to commit checkout if no branch matches
