@@ -2,7 +2,7 @@ use clap::Parser;
 use colored::Colorize;
 use std::env;
 use std::path::PathBuf;
-use std::process::{Command, exit};
+use std::process::{exit, Command};
 
 /// A git tool that simplifies branch checkout by allowing partial branch name matching
 #[derive(Parser)]
