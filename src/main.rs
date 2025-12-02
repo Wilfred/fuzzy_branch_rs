@@ -65,6 +65,13 @@ fn get_git_remotes() -> Vec<String> {
         .collect()
 }
 
+/// Get the current branch name
+fn get_current_branch() -> Option<String> {
+    run_git_command(&["branch", "--show-current"])
+        .ok()
+        .map(|s| s.trim().to_string())
+}
+
 /// Get all git refs (branches)
 fn get_git_refs(prefix: &str) -> Vec<String> {
     let format_arg = "--format=%(refname:short)";
@@ -202,8 +209,13 @@ fn main() {
     if cli.pattern.is_none() {
         let mut local_branches = get_git_refs("refs/heads/");
         local_branches.sort();
+        let current_branch = get_current_branch();
         for branch in local_branches {
-            println!("{}", branch);
+            if Some(&branch) == current_branch.as_ref() {
+                println!("{} {}", "*".green().bold(), branch.green().bold());
+            } else {
+                println!("  {}", branch);
+            }
         }
         return;
     }
@@ -241,8 +253,14 @@ fn main() {
         _ => {
             // Multiple matches, show them to the user
             eprintln!("Ambiguous branch name '{}'. Multiple matches:", needle);
+            let current_branch = get_current_branch();
             for branch in matches {
-                eprintln!("  {}", highlight_match(&branch.name, needle));
+                let highlighted = highlight_match(&branch.name, needle);
+                if Some(&branch.name) == current_branch.as_ref() {
+                    eprintln!("{} {}", "*".green().bold(), highlighted);
+                } else {
+                    eprintln!("  {}", highlighted);
+                }
             }
             exit(1);
         }
