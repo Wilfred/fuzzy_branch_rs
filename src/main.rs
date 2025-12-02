@@ -10,8 +10,8 @@ use std::process::{Command, exit};
 #[command(version)]
 #[command(about = "Fuzzy git branch checkout", long_about = None)]
 struct Cli {
-    /// Branch name or pattern to match (e.g., 'dev' to match 'develop')
-    pattern: String,
+    /// Branch name or pattern to match (e.g., 'dev' to match 'develop'). If not provided, lists all local branches alphabetically.
+    pattern: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -198,7 +198,17 @@ fn main() {
         exit(1);
     }
 
-    let needle = &cli.pattern;
+    // If no pattern is provided, list all local branches alphabetically
+    if cli.pattern.is_none() {
+        let mut local_branches = get_git_refs("refs/heads/");
+        local_branches.sort();
+        for branch in local_branches {
+            println!("{}", branch);
+        }
+        return;
+    }
+
+    let needle = cli.pattern.as_ref().unwrap();
 
     // Get all tracking branches
     let branches = get_tracking_branches();
