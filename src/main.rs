@@ -155,9 +155,17 @@ fn match_branch_substring(branches: &[Branch], needle: &str) -> Vec<Branch> {
 
 /// Checkout a branch
 fn checkout_branch(branch: &Branch) -> Result<(), String> {
-    let status = Command::new("git")
-        .arg("checkout")
-        .arg(&branch.name)
+    let mut cmd = Command::new("git");
+    cmd.arg("checkout");
+
+    // If it's a remote branch, create a local tracking branch
+    if branch.is_remote {
+        cmd.arg("--track");
+    }
+
+    cmd.arg(&branch.name);
+
+    let status = cmd
         .status()
         .map_err(|e| format!("Failed to execute git checkout: {}", e))?;
 
